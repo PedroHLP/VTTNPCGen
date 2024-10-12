@@ -535,8 +535,8 @@ export default class NPCGenerator extends FormApplication {
 
     if (!game.settings.get("npcgen", "compatMode")) {
       actorOptions.type = "npc";
-      actorOptions.data.details.type = d.genRace;
-      actorOptions.data.details.biography.value =
+      actorOptions.system.details.type = d.genRace; // Updated for v10
+      actorOptions.system.details.biography.value =
         `<p>${game.i18n.localize("npcGen.proficiencies")}: ` +
         d.genProficiencies.trim().slice(0, -1).replace(/\r?\n/g, ", ") +
         "\n</p>" +
@@ -546,8 +546,17 @@ export default class NPCGenerator extends FormApplication {
     }
 
     if (!isApi) {
-      let actor = await CONFIG.Actor.documentClass.create(foundry.utils.deepClone(actorOptions));
-      actor.sheet.render(true);
+      try {
+        let actor = await CONFIG.Actor.documentClass.create(foundry.utils.deepClone(actorOptions));
+        if (actor.sheet) {
+          actor.sheet.render(true);
+        } else {
+          console.error("Actor sheet is undefined.");
+        }
+      } catch (error) {
+        console.error("Error creating actor:", error);
+        ui.notifications.error(`Error creating actor: ${error.message}`);
+      }
     } else {
       return actorOptions;
     }
@@ -622,7 +631,7 @@ export default class NPCGenerator extends FormApplication {
     if (Array.isArray(folderList)) {
       await asyncForEach(folderList, async (folderPath) => {
         let newFileObject = await FilePicker.browse(source, folderPath);
-        let folderContent = await this._getIcons(newFileObject, source);
+        let folderContent = await this._getIcons(newFileObject, source, regex); // Pass regex here
 
         if (regex?.length) {
           iconList = iconList.concat(folderContent.filter((file) => new RegExp(regex).test(file)));
@@ -1060,9 +1069,10 @@ export default class NPCGenerator extends FormApplication {
     biography = biography.concat(`<p>&nbsp;</p>\n<p><strong>${game.i18n.localize("npcGen.traits")}:</strong></p>\n`);
     // traits
     biography = biography.concat("<ul>\n");
-    d.genTraits.split(/\r?\n/).forEach((trait) => {
+    this.genTraits.forEach((trait) => { // Usar this.genTraits em vez de d.genTraits
       biography = biography.concat(`<li>${trait.replace("•", "")}</li>\n`);
     });
+    
     biography = biography.concat("</ul>\n");
     // static line
     biography = biography.concat("<p>&nbsp;</p>");
@@ -1123,7 +1133,7 @@ export default class NPCGenerator extends FormApplication {
     let config = {
       name: d.genClass,
       type: "class",
-      data: {
+      system: { // Updated for v10
         source: this.classesJSON[d.genClass].source,
         levels: d.level,
         subclass: d.genSubclass,
@@ -1151,7 +1161,7 @@ export default class NPCGenerator extends FormApplication {
       permission: {
         default: 0,
       },
-      data: {
+      system: { // Updated for v10
         abilities: abilities,
         attributes: {
           ac: {
@@ -1185,8 +1195,8 @@ export default class NPCGenerator extends FormApplication {
         },
       },
       img: d.genIcon,
-      type: "character",
-      items: [duplicate(classItem.data)],
+      type: "npc", // Ensure this corresponds to the correct actor type
+      items: [classItem.toObject()], // Correct: Include the entire item object
     };
   }
 
